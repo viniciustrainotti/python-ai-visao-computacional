@@ -4,6 +4,7 @@ import os
 import joblib
 import cv2
 import numpy as np
+import pandas as pd
 import random
 from sklearn.feature_extraction import FeatureHasher
 from skimage.feature import greycomatrix, greycoprops
@@ -16,15 +17,25 @@ from sklearn.model_selection import train_test_split
 def load_data(folder_name):
     X = []
     y = []
-    for class_label in os.listdir(folder_name):
-        class_folder = os.path.join(folder_name, class_label)
-        if os.path.isdir(class_folder):
-            for image_path in os.listdir(class_folder):
-                image_path = os.path.join(class_folder, image_path)
-                image = cv2.imread(image_path)
-                features = extract_features_opencv(image)
-                X.append(features)
-                y.append(class_label)
+
+    print(folder_name)
+    if folder_name.find(".csv") > 0:
+        df = pd.read_csv(folder_name)
+        for index, row in df.iterrows():
+            image = cv2.imread(row["path"])
+            features = extract_features_opencv(image)
+            X.append(features)
+            y.append(row["class"])
+    else:
+        for class_label in os.listdir(folder_name):
+            class_folder = os.path.join(folder_name, class_label)
+            if os.path.isdir(class_folder):
+                for image_path in os.listdir(class_folder):
+                    image_path = os.path.join(class_folder, image_path)
+                    image = cv2.imread(image_path)
+                    features = extract_features_opencv(image)
+                    X.append(features)
+                    y.append(class_label)
     return X, y
 
 def extract_features_opencv(image):
@@ -57,6 +68,7 @@ def train_and_evaluate(X_train, y_train, X_test, y_test):
         recall = recall_score(y_test, y_pred, average='macro')
         f1 = f1_score(y_test, y_pred, average='macro')
         results[name] = {
+            'classifier': clf,
             'accuracy': accuracy,
             'precision': precision,
             'recall': recall,
@@ -64,16 +76,25 @@ def train_and_evaluate(X_train, y_train, X_test, y_test):
         }
     return results
 
+# if __name__ == '__main__':
+#     file_name = 'banco_dentes_IAA'
+#     X, y = load_data(file_name)
+#     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, train_size=0.8, random_state=42)
+#     results = train_and_evaluate(X_train, y_train, X_test, y_test)
+#     print(results)
+#     best_clf = max(results, key=lambda x: results[x]['accuracy'])
+#     joblib.dump(results[best_clf]['classifier'], 'best_model.pkl')
+#     #joblib.dump(best_clf, 'best_model.pkl')
+#     for classifier, metrics in results.items():
+#         print(f'{classifier} Results:')
+#         print(f'Accuracy: {metrics["accuracy"]}')
+#         print(f'Precision: {metrics["precision"]}')
+#         print(f'Recall: {metrics["recall"]}')
+#         print(f'F1 Score: {metrics["f1"]}')
+
 if __name__ == '__main__':
-    file_name = 'banco_dentes_IAA'
+    file_name = 'new_images.csv'
     X, y = load_data(file_name)
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, train_size=0.8, random_state=42)
-    results = train_and_evaluate(X_train, y_train, X_test, y_test)
-    best_clf = max(results, key=lambda x: results[x]['accuracy'])
-    joblib.dump(best_clf, 'best_model.pkl')
-    for classifier, metrics in results.items():
-        print(f'{classifier} Results:')
-        print(f'Accuracy: {metrics["accuracy"]}')
-        print(f'Precision: {metrics["precision"]}')
-        print(f'Recall: {metrics["recall"]}')
-        print(f'F1 Score: {metrics["f1"]}')
+    best_clf = joblib.load('best_model.pkl')
+    y_pred = best_clf.predict(X)
+    print(y_pred)
